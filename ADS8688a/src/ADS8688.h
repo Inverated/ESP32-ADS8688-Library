@@ -1,12 +1,12 @@
 // ADS8688 library for Arduino / ESP32
 // Original: Sylvain GARNAVAULT - 2016/03/13
-// Revised:  Bug fixes and ESP32 support
+// Revised:  Bug fixes and ESP32 support + Speed up reading (05/2026)
 //
 // Key fixes vs original:
 //  - cmdRegister() result changed int16_t -> uint16_t (datasheet p.31, Fig 69:
 //    output is straight binary unsigned; original code misread any code above
 //    0x7FFF - i.e. any positive signal above midscale - as negative)
-//  - MSB shift explicitly cast to uint16_t to prevent overflow (p.11)
+//  - MSB shift explicitly cast to uint16_t to prevent overflow
 //  - Always transmits a full 32-bit frame; original sent only 16 bits on the
 //    first autoRst()/manualChannel() call from IDLE, risking an invalid first
 //    conversion (p.41, Fig 81)
@@ -120,21 +120,13 @@
 #define MODE_AUTO      6
 #define MODE_AUTO_RST  7
 
-#define ADS8688_SPI_CLOCK  4000000UL
+#define ADS8688_SPI_CLOCK  17000000UL
 
 // ---------------------------------------------------------------------------
 // CLASS DECLARATION
 // ---------------------------------------------------------------------------
 class ADS8688 {
 public:
-
-    // -----------------------------------------------------------------------
-    // Constructors
-    //
-    // On ESP32 SPI.begin() with no arguments may map to the wrong GPIO pins.
-    // Use the 4-pin constructor to guarantee correct assignment (p.32, Fig 70).
-    // -----------------------------------------------------------------------
-
     // Default: CS = pin 10, platform-default SPI pins. Arduino only.
     ADS8688();
 
@@ -171,21 +163,17 @@ public:
     // Every function sends a complete 32-bit SPI frame:
     //   - first 16 bits  : command word sent to the device via SDI
     //   - next  16 bits  : dummy clocks that clock out the ADC result via SDO
-    //
-    // ONE-FRAME LATENCY: when the device is converting (AUTO or MANUAL mode),
-    // the uint16_t return value is the ADC result for the channel that was
-    // sampled in the PREVIOUS frame, not the current one (p.34, Fig 72).
-    // In all other modes the return value is 0.
     // -----------------------------------------------------------------------
     uint16_t noOp();                     // Continue current mode; returns ADC result
-    uint16_t standBy();                  // Standby (ref on; fast 20 µs wake-up)
+    uint16_t noOpRaw();                  // Continue current mode; returns ADC result; Manually set SPI.beginTransaction(SPISettings(ADS8688_SPI_CLOCK, MSBFIRST, SPI_MODE1)) and SPI.endTransaction()
+    uint16_t standBy();                  // Standby (ref on; fast 20 s wake-up)
     uint16_t powerDown();                // Full power-down (15 ms wake-up with int ref)
     uint16_t reset();                    // Reset all registers; must reconfigure before sampling
     uint16_t autoRst();                  // Start auto channel-scan (channels per AUTO_SEQ_EN)
     uint16_t manualChannel(uint8_t ch);  // Select one channel manually; ch 0-7, or 8 for AUX
 
     // -----------------------------------------------------------------------
-    // Auto-scan channel control  (AUTO_SEQ_EN 0x01 / CH_PWR_DN 0x02, p.47)
+    // Auto-scan channel control  (AUTO_SEQ_EN 0x01 / CH_PWR_DN 0x02)
     // flag is an 8-bit mask: bit n corresponds to channel n.
     // -----------------------------------------------------------------------
 
@@ -202,7 +190,7 @@ public:
     uint8_t  getChannelPowerDown();
 
     // -----------------------------------------------------------------------
-    // Per-channel input range  (RG_Ch_n registers, p.47)
+    // Per-channel input range  (RG_Ch_n registers)
     // Pass one of the R0-R8 constants.
     // -----------------------------------------------------------------------
     uint8_t  getChannelRange(uint8_t ch);
@@ -259,14 +247,14 @@ public:
     // -----------------------------------------------------------------------
     // Software-enforced sample rate
     //
-    // Hardware maximum: 500 kSPS aggregate across all channels (p.8).
+    // Hardware maximum: 500 kSPS aggregate across all channels.
     // These helpers use micros() to pace calls to cmdRegister().
     //
     // For N channels at F samples/channel/sec in AUTO_RST mode set:
     //   setSampleRate(N * F)
     // Example: 8 channels at 1 kHz each -> setSampleRate(8000)
     //
-    // Pass sps = 0 to disable rate limiting (run at full hardware speed).
+    // Pass sps = 0 to disable rate limiting (run at full hardware speed but limited by SPI transaction end).
     // -----------------------------------------------------------------------
     void     setSampleRate(uint32_t sps);
     uint32_t getSampleRate();    // Returns 0 when rate limiting is disabled
@@ -283,7 +271,7 @@ private:
     void     _init();              // Shared constructor body
     void     writeRegister(uint8_t reg, uint8_t val);
     uint8_t  readRegister(uint8_t reg);
-    uint16_t cmdRegister(uint8_t reg);
+    uint16_t cmdRegister(uint8_t reg, bool manual = false);
 };
 
 #endif // ADS8688_H
