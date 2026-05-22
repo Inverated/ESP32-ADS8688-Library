@@ -120,7 +120,7 @@
 #define MODE_AUTO      6
 #define MODE_AUTO_RST  7
 
-#define ADS8688_SPI_CLOCK  17000000UL
+#define ADS8688_SPI_CLOCK  20000000UL
 
 // ---------------------------------------------------------------------------
 // CLASS DECLARATION
@@ -260,6 +260,15 @@ public:
     uint32_t getSampleRate();    // Returns 0 when rate limiting is disabled
     bool     isSampleReady();    // True when the minimum sample period has elapsed
     void     waitForSample();    // Block until the sample period elapses
+
+    // -----------------------------------------------------------------------
+    // Optimised Reading
+    //
+    // Removes multiple micros() by directly assigning all 8 channel reading into an array
+    // Returns the timing when the channels are finished reading in micros()
+    // -----------------------------------------------------------------------
+    uint32_t   readAllChannels(uint16_t* out8);  // Must be in AUTO mode already
+
 
 private:
     float    _vref;

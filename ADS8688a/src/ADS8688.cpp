@@ -124,7 +124,7 @@ void ADS8688::setChannelSPD(uint8_t flag) {
 }
 
 // Write AUTO_SEQ_EN: bit n = 1 includes channel n in the auto scan.
-// Default power-on value = 0xFF (0x11111111 -> 1 means active from right to left)
+// Default power-on value = 0xFF (0b11111111 -> 1 means active from right to left)
 void ADS8688::setChannelSequence(uint8_t flag) {
     writeRegister(AUTO_SEQ_EN, flag);
 }
@@ -333,6 +333,34 @@ void ADS8688::waitForSample() {
     }
 }
 
+IRAM_ATTR uint32_t ADS8688::readAllChannels(uint16_t* out) {    
+    // Modified combine multiple noOpsRaw + cmdRegister to reduce micros() overhead
+    
+    // 4-byte tx: [cmd=0x00, 0x00, 0x00, 0x00] - NO_OP
+    // Already in beginTransaction from caller
+    static const uint8_t tx[4] = {0x00, 0x00, 0x00, 0x00};
+    uint8_t rx[4];
+
+    for (uint8_t i = 0; i < 8; i++) {
+        #ifdef ESP32
+            GPIO.out_w1tc.val = (1UL << _cs);
+            SPI.transferBytes(tx, rx, 4);
+            GPIO.out_w1ts.val = (1UL << _cs);
+        #else
+            digitalWrite(_cs, LOW);
+            for (uint8_t b = 0; b < 4; b++) rx[b] = SPI.transfer(tx[b]);
+            digitalWrite(_cs, HIGH);
+        #endif
+
+        out[i] = ((uint16_t)(rx[1] & 0x01) << 15)
+               | ((uint16_t)rx[2]          <<  7)
+               | ((uint16_t)rx[3]          >>  1);
+    }
+    const uint32_t end_time = micros();
+    _lastSampleUs = end_time;  // Once per 8-channel scan, not 8x
+    return end_time;
+}
+
 // ===========================================================================
 // CONVERSION HELPERS (Flatten from original)
 // ===========================================================================
@@ -474,7 +502,7 @@ uint16_t ADS8688::cmdRegister(uint8_t reg, bool manual) {
     uint8_t lsb = rx[3];
 
     if (_mode > MODE_PROG) {
-        _lastSampleUs = micros();
+        _lastSampleUs = micros();   // cmdRegister is called every channel, slow
     }
 
     if (_mode == MODE_POWER_DN) {
