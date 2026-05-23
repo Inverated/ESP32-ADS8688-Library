@@ -5,6 +5,8 @@
 #define PIN_MOSI 5
 #define PIN_MISO 4
 
+#define SAMPLE_RATE 4
+
 ADS8688 adc(PIN_CS, PIN_SCK, PIN_MOSI, PIN_MISO);
 
 void setup() {
@@ -19,11 +21,8 @@ void setup() {
         delay(100);
     }
 
-    //adc.setChannelSequence(0xFF);
-    //adc.setSampleRate(4);
-
     adc.setChannelSequence(0b00001110);
-    adc.setSampleRate(3);
+    adc.setSampleRate(SAMPLE_RATE);
 
     // Start auto scan mode
     adc.autoRst();

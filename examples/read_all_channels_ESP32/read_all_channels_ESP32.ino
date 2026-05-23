@@ -5,6 +5,8 @@
 #define PIN_MOSI 5
 #define PIN_MISO 4
 
+#define SAMPLING_RATE 0
+
 ADS8688 adc(PIN_CS, PIN_SCK, PIN_MOSI, PIN_MISO);
 
 // Store raw & converted ADC readings
@@ -47,7 +49,7 @@ void setup() {
     // Enable all 8 channels in auto scan
     adc.setChannelSequence(0xFF);
 
-    adc.setSampleRate(0);
+    adc.setSampleRate(SAMPLING_RATE);
 
     // Start auto scan mode
     adc.autoRst();
