@@ -2,6 +2,7 @@
 ADS8688a Arduino Library adapted from [siteswapjuggler](https://github.com/siteswapjuggler/ADS8688a) 
 
 # Description
+- 16bit, 500kSPS sampling rate, bipolar ADC
 - Very convinent and easy to wire chip. Allows bipolar input up to 10.24V with a single 5V analog power source. Comes with internal voltage reference, adjustable digital supply voltage for direct connection with ESP32. Only require capacitor and resistor for decoupling.
 - Original code meant for arduino board. SPI pins not customisable
 - Reworked the original library for my use on ESP32-C3 project, to guarenteed to work across all ESP platform
