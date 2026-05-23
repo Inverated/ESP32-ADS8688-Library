@@ -120,7 +120,7 @@
 #define MODE_AUTO      6
 #define MODE_AUTO_RST  7
 
-#define ADS8688_SPI_CLOCK  20000000UL
+#define ADS8688_SPI_CLOCK  30000000UL
 
 // ---------------------------------------------------------------------------
 // CLASS DECLARATION
