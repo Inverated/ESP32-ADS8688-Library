@@ -338,7 +338,7 @@ IRAM_ATTR uint32_t ADS8688::readAllChannels(uint16_t* out) {
     
     // 4-byte tx: [cmd=0x00, 0x00, 0x00, 0x00] - NO_OP
     // Already in beginTransaction from caller
-    static const uint8_t tx[4] = {0x00, 0x00, 0x00, 0x00};
+    static const uint8_t tx[4] = {0x00, 0x00, 0x00, 0x00};  // [status = noOp, ......]
     uint8_t rx[4];
 
     for (uint8_t i = 0; i < 8; i++) {
@@ -346,15 +346,22 @@ IRAM_ATTR uint32_t ADS8688::readAllChannels(uint16_t* out) {
             GPIO.out_w1tc.val = (1UL << _cs);
             SPI.transferBytes(tx, rx, 4);
             GPIO.out_w1ts.val = (1UL << _cs);
+            out[i] = ((uint16_t)(rx[1] & 0x01) << 15)
+                   | ((uint16_t)rx[2]          <<  7)
+                   | ((uint16_t)rx[3]          >>  1);
         #else
             digitalWrite(_cs, LOW);
-            for (uint8_t b = 0; b < 4; b++) rx[b] = SPI.transfer(tx[b]);
+            SPI.transfer(reg);
+            SPI.transfer(0x00);
+            int16_t result = 0;
+            if (_mode > 4) {
+                byte MSB = SPI.transfer(0x00);
+                byte LSB = SPI.transfer(0x00);
+                out[i] = ( MSB << 8) | LSB;
+                }
             digitalWrite(_cs, HIGH);
         #endif
 
-        out[i] = ((uint16_t)(rx[1] & 0x01) << 15)
-               | ((uint16_t)rx[2]          <<  7)
-               | ((uint16_t)rx[3]          >>  1);
     }
     const uint32_t end_time = micros();
     _lastSampleUs = end_time;  // Once per 8-channel scan, not 8x
@@ -410,20 +417,22 @@ void ADS8688::writeRegister(uint8_t reg, uint8_t val) {
         SPISettings(ADS8688_SPI_CLOCK, MSBFIRST, SPI_MODE1)
     );
 
-    uint8_t tx[3];
-    uint8_t rx[3];
-
-    tx[0] = (uint8_t)((reg << 1) | 0x01);
-    tx[1] = val;
-    tx[2] = 0x00;
-    
     #ifdef ESP32
+        uint8_t tx[3];
+        uint8_t rx[3];
+
+        tx[0] = (uint8_t)((reg << 1) | 0x01);
+        tx[1] = val;
+        tx[2] = 0x00;
+
         GPIO.out_w1tc.val = ((uint32_t) 1 << _cs);
         SPI.transferBytes(tx, rx, 3);
         GPIO.out_w1ts.val = ((uint32_t) 1 << _cs);
     #else
         digitalWrite(_cs, LOW);
-        for (uint8_t i = 0; i < 3; i++) rx[i] = SPI.transfer(tx[i]);
+        SPI.transfer((uint8_t)((reg << 1) | 0x01));
+        SPI.transfer(val);
+        SPI.transfer(0x00);
         digitalWrite(_cs, HIGH);
     #endif
 
@@ -438,14 +447,14 @@ uint8_t ADS8688::readRegister(uint8_t reg) {
         SPISettings(ADS8688_SPI_CLOCK, MSBFIRST, SPI_MODE1)
     );
 
-    uint8_t tx[3];
-    uint8_t rx[3];
-
-    tx[0] = (uint8_t)((reg << 1) | 0x00);
-    tx[1] = 0x00;
-    tx[2] = 0x00;
-    
     #ifdef ESP32
+        uint8_t tx[3];
+        uint8_t rx[3];
+
+        tx[0] = (uint8_t)((reg << 1) | 0x00);
+        tx[1] = 0x00;
+        tx[2] = 0x00;
+        
         GPIO.out_w1tc.val = ((uint32_t) 1 << _cs);
 
         SPI.transferBytes(tx, rx, 3);
@@ -457,8 +466,9 @@ uint8_t ADS8688::readRegister(uint8_t reg) {
         GPIO.out_w1ts.val = ((uint32_t) 1 << _cs);
     #else
         digitalWrite(_cs, LOW);
-        for (uint8_t i = 0; i < 3; i++) rx[i] = SPI.transfer(tx[i]);
-        uint8_t result = rx[2];
+        SPI.transfer((uint8_t)((reg << 1) | 0x00));
+        SPI.transfer(0x00);
+        uint8_t result = SPI.transfer(0x00);
         digitalWrite(_cs, HIGH);
     #endif
 
@@ -475,22 +485,29 @@ uint16_t ADS8688::cmdRegister(uint8_t reg, bool manual) {
             SPISettings(ADS8688_SPI_CLOCK, MSBFIRST, SPI_MODE1)
         );
     }
-
-    uint8_t tx[4];
-    uint8_t rx[4];
-
-    tx[0] = reg;
-    tx[1] = 0x00;
-    tx[2] = 0x00;
-    tx[3] = 0x00;
-
+    
     #ifdef ESP32
+        uint8_t tx[4];
+        uint8_t rx[4];
+
+        tx[0] = reg;
+        tx[1] = 0x00;
+        tx[2] = 0x00;
+        tx[3] = 0x00;
+
         GPIO.out_w1tc.val = ((uint32_t)1 << _cs);
         SPI.transferBytes(tx, rx, 4);
         GPIO.out_w1ts.val = ((uint32_t)1 << _cs);
     #else
         digitalWrite(_cs, LOW);
-        for (uint8_t i = 0; i < 4; i++) rx[i] = SPI.transfer(tx[i]);
+        SPI.transfer(reg);
+        SPI.transfer(0x00);
+        uint16_t result = 0;
+        if (_mode > MODE_PROG) {
+            uint8_t MSB = SPI.transfer(0x00);
+            uint8_t LSB = SPI.transfer(0x00);
+            result = (MSB << 8) | LSB;
+        }
         digitalWrite(_cs, HIGH);
     #endif
 
@@ -502,7 +519,12 @@ uint16_t ADS8688::cmdRegister(uint8_t reg, bool manual) {
     uint8_t lsb = rx[3];
 
     if (_mode > MODE_PROG) {
-        _lastSampleUs = micros();   // cmdRegister is called every channel, slow
+        _lastSampleUs = micros();   // cmdRegister is called every channel, slow. Use getAllChannels instead
+#ifdef ESP32
+        result = ((uint16_t)(rx[1] & 0x01) << 15)
+            | ((uint16_t)rx[2]          <<  7)
+            | ((uint16_t)rx[3]          >>  1);
+#endif
     }
 
     if (_mode == MODE_POWER_DN) {
@@ -510,12 +532,6 @@ uint16_t ADS8688::cmdRegister(uint8_t reg, bool manual) {
     }
 
     uint16_t result = 0;
-
-    if (_mode > MODE_PROG) {
-        result = ((uint16_t)(rx[1] & 0x01) << 15)
-            | ((uint16_t)rx[2]          <<  7)
-            | ((uint16_t)rx[3]          >>  1);
-    }
 
     switch (reg) {
 

@@ -5,7 +5,7 @@
 #define PIN_MOSI 5
 #define PIN_MISO 4
 
-#define SAMPLING_RATE 0
+#define SAMPLING_RATE 5
 
 ADS8688 adc(PIN_CS, PIN_SCK, PIN_MOSI, PIN_MISO);
 

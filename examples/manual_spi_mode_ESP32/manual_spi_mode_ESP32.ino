@@ -5,7 +5,8 @@
 #define PIN_MOSI 5
 #define PIN_MISO 4
 
-#define ENABLE_SPEED_TEST 1
+#define ENABLE_SPEED_TEST 0
+#define SAMPLING_RATE 5
 ADS8688 adc(PIN_CS, PIN_SCK, PIN_MOSI, PIN_MISO);
 
 // Store raw & converted ADC readings
@@ -43,7 +44,7 @@ void setup() {
 
     // Enable all 8 channels in auto scan
     adc.setChannelSequence(0xFF);
-    adc.setSampleRate(0);
+    adc.setSampleRate(SAMPLING_RATE);
 
     // Start auto scan mode
     adc.autoRst();
@@ -63,13 +64,13 @@ void loop() {
 
     for (int i = 0; i < sizeof(r1_pins) / sizeof(r1_pins[0]); i++) {
         uint8_t idx = r1_pins[i];
-        raw[idx]   = raw_readings[idx] - 18;
+        raw[idx]   = raw_readings[idx];
         if (!ENABLE_SPEED_TEST) volts[idx] = adc.I2V(raw[idx], R1);
     }
 
     for (int i = 0; i < sizeof(r5_pins)  / sizeof(r5_pins[0]); i++) {
         uint8_t idx = r5_pins[i];
-        raw[idx]   = max(raw_readings[idx] - 288, 0);
+        raw[idx] = max(raw_readings[idx], (uint16_t)0);
         if (!ENABLE_SPEED_TEST) volts[idx] = adc.I2V(raw[idx], R5);
     }
 
