@@ -486,6 +486,7 @@ uint16_t ADS8688::cmdRegister(uint8_t reg, bool manual) {
         );
     }
     
+    uint16_t result = 0;
     #ifdef ESP32
         uint8_t tx[4];
         uint8_t rx[4];
@@ -502,7 +503,6 @@ uint16_t ADS8688::cmdRegister(uint8_t reg, bool manual) {
         digitalWrite(_cs, LOW);
         SPI.transfer(reg);
         SPI.transfer(0x00);
-        uint16_t result = 0;
         if (_mode > MODE_PROG) {
             uint8_t MSB = SPI.transfer(0x00);
             uint8_t LSB = SPI.transfer(0x00);
@@ -530,8 +530,6 @@ uint16_t ADS8688::cmdRegister(uint8_t reg, bool manual) {
     if (_mode == MODE_POWER_DN) {
         delay(15);
     }
-
-    uint16_t result = 0;
 
     switch (reg) {
 
