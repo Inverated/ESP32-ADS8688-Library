@@ -9,7 +9,7 @@ ADS8688a Arduino Library adapted from [siteswapjuggler](https://github.com/sites
 # New Features
 - Manual SPI pin setting -> Initialise with ADS8688(uint8_t cs, uint8_t sck, uint8_t mosi, uint8_t miso);
 - Replace signed variables with unsigned -> In bipolar mode, midpoint is used for 0V, adc reading will not be negative
-- Added software speed setting by tracking time between fetching -> adc.setSampleRate(0-500000); adc.waitForSample();
+- Added software speed setting by tracking time between fetching -> adc.setSampleRate(0 to 500000); adc.waitForSample();
 - Fix known bit shift issue when converting SPI transfer for ESP32
     - [Shifted Reading](https://www.reddit.com/r/arduino/comments/1f0yewj/ads8688_16bit_saradc_data_acquisition_module_and/)
     - [SPI falling edge off](https://e2e.ti.com/support/data-converters-group/data-converters/f/data-converters-forum/452422/ads8688-flow-chart)
@@ -22,5 +22,5 @@ ADS8688a Arduino Library adapted from [siteswapjuggler](https://github.com/sites
     - **Max achieved speed  -> ~297kSPS**
     - **Max rated speed     ->  500kSPS**
 - Added function description (by Claude)
-    - Alarm & daisy function not tested on ESP32.
+- Alarm & daisy function not tested on ESP32.
 - Additional examples for ESP32 with the newly added functions
